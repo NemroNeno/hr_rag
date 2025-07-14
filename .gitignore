@@ -1,0 +1,12 @@
+*.pdf
+bge-small-en-v1.5_openai-tos_vectors
+.env
+\venv
+vector_store
+__pycache__ 
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
