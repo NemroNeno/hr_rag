@@ -39,18 +39,43 @@ embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 # Set up the global settings
 Settings.llm = llm
 
-# Load the index from storage
+# Set up paths and constants
 output_dir = './vector_store/'
-print(f"Loading existing index from {output_dir}...")
-storage_context = StorageContext.from_defaults(persist_dir=output_dir)
-index = load_index_from_storage(
-    storage_context=storage_context,
-    embed_model=embed_model
-)
-print("Index loaded successfully")
-
-# Set up the query engine
 TopK = 5
+
+def ensure_vector_store():
+    """
+    Ensures that the vector store exists and is loaded.
+    If it doesn't exist, creates it by importing create_vectore_store module.
+    Returns the loaded index.
+    """
+    try:
+        print(f"Attempting to load existing index from {output_dir}...")
+        storage_context = StorageContext.from_defaults(persist_dir=output_dir)
+        index = load_index_from_storage(
+            storage_context=storage_context,
+            embed_model=embed_model
+        )
+        print("Index loaded successfully")
+        return index
+    except Exception as e:
+        print(f"Vector store not found or error loading: {str(e)}")
+        print("Creating new vector store...")
+        try:
+            import create_vectore_store
+            # After creation, load the new index
+            storage_context = StorageContext.from_defaults(persist_dir=output_dir)
+            index = load_index_from_storage(
+                storage_context=storage_context,
+                embed_model=embed_model
+            )
+            print("New vector store created and loaded successfully")
+            return index
+        except Exception as create_error:
+            raise ValueError(f"Failed to create vector store: {str(create_error)}")
+
+# Initial index loading
+index = ensure_vector_store()
 
 # Define the prompt template
 qa_prompt_tmpl = PromptTemplate(
@@ -96,6 +121,25 @@ async def process_query(request: QueryRequest):
     Process a query and return the RAG response
     """
     try:
+        # Ensure vector store exists and is loaded
+        global index, query_engine
+        index = ensure_vector_store()
+        
+        # Recreate query engine with latest index if needed
+        retriever = VectorIndexRetriever(
+            index=index,
+            similarity_top_k=TopK,
+        )
+        response_synthesizer = get_response_synthesizer(response_mode=ResponseMode.SIMPLE_SUMMARIZE)
+        query_engine = RetrieverQueryEngine.from_args(
+            retriever,
+            response_synthesizer=response_synthesizer,
+        )
+        query_engine.update_prompts(
+            {"response_synthesizer:text_qa_template": qa_prompt_tmpl}
+        )
+        
+        # Process the query
         result = get_rag_answer(request.query)
         return QueryResponse(response=result)
     except Exception as e:
