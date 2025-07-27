@@ -1,12 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any
 import uvicorn
-from llama_index.llms.groq import Groq
 import os
-from llama_index.core import Settings
 from dotenv import load_dotenv
+from llama_index.llms.groq import Groq
 from llama_index.core import (
+    Settings,
     StorageContext,
     load_index_from_storage,
     PromptTemplate,
